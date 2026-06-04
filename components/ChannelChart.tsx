@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Sector } from 'recharts';
 import type { ChannelItem } from '@/lib/types';
+import { DarkTooltipShell } from '@/components/DarkTooltip';
 
 const COLORS   = ['#f07c20', '#6366f1', '#10b981', '#f59e0b'];
 const COLORS_D = ['#fbbf80', '#a5b4fc', '#6ee7b7', '#fcd34d'];
@@ -14,17 +15,11 @@ function DarkTooltip({ active, payload }: {
   if (!active || !payload?.length) return null;
   const d = payload[0];
   return (
-    <div style={{
-      background: '#1a1a2e',
-      border: '1px solid rgba(255,255,255,0.08)',
-      borderRadius: 12,
-      padding: '10px 16px',
-      boxShadow: '0 8px 32px rgba(0,0,0,0.28)',
-    }}>
+    <DarkTooltipShell padding="10px 16px">
       <p style={{ color: '#fff', fontWeight: 700, fontSize: 13, marginBottom: 4 }}>{d.name}</p>
       <p style={{ color: '#f07c20', fontWeight: 700, fontSize: 18 }}>{d.value}%</p>
       <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12 }}>{d.payload.display}원</p>
-    </div>
+    </DarkTooltipShell>
   );
 }
 

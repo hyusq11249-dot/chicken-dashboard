@@ -5,6 +5,7 @@ import {
   ResponsiveContainer, LabelList,
 } from 'recharts';
 import type { ProductItem } from '@/lib/types';
+import { DarkTooltipShell } from '@/components/DarkTooltip';
 
 function barColor(i: number) {
   if (i === 0) return '#f07c20';
@@ -24,18 +25,12 @@ function DarkTooltip({ active, payload }: {
   if (!active || !payload?.length) return null;
   const d = payload[0].payload;
   return (
-    <div style={{
-      background: '#1a1a2e',
-      border: '1px solid rgba(255,255,255,0.08)',
-      borderRadius: 10,
-      padding: '10px 14px',
-      boxShadow: '0 8px 32px rgba(0,0,0,0.28)',
-    }}>
+    <DarkTooltipShell padding="10px 14px" radius={10}>
       <p style={{ color: 'rgba(255,255,255,0.65)', fontSize: 12, marginBottom: 4 }}>{d.name}</p>
       <p style={{ color: '#f07c20', fontWeight: 700, fontSize: 16 }}>
         {d.display}<span style={{ fontSize: 11, fontWeight: 400, marginLeft: 4 }}>원</span>
       </p>
-    </div>
+    </DarkTooltipShell>
   );
 }
 

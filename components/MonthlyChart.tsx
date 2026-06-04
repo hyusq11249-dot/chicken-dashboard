@@ -6,6 +6,7 @@ import {
   Tooltip, ResponsiveContainer,
 } from 'recharts';
 import type { TrendRow } from '@/lib/types';
+import { DarkTooltipShell } from '@/components/DarkTooltip';
 
 const LINES = [
   { key: '후라이드양념', label: '후라이드/양념치킨', color: '#f07c20' },
@@ -21,14 +22,7 @@ function DarkTooltip({ active, payload, label }: {
 }) {
   if (!active || !payload?.length) return null;
   return (
-    <div style={{
-      background: '#1a1a2e',
-      border: '1px solid rgba(255,255,255,0.08)',
-      borderRadius: 12,
-      padding: '12px 16px',
-      boxShadow: '0 8px 32px rgba(0,0,0,0.28)',
-      minWidth: 160,
-    }}>
+    <DarkTooltipShell minWidth={160}>
       <p style={{ color: '#fff', fontWeight: 700, fontSize: 13, marginBottom: 8 }}>{label}</p>
       {payload.map(p => (
         <div key={p.name} style={{ display: 'flex', justifyContent: 'space-between', gap: 16, marginBottom: 4 }}>
@@ -39,7 +33,7 @@ function DarkTooltip({ active, payload, label }: {
           <span style={{ color: '#fff', fontWeight: 700, fontSize: 12 }}>{p.value.toLocaleString()}만</span>
         </div>
       ))}
-    </div>
+    </DarkTooltipShell>
   );
 }
 
