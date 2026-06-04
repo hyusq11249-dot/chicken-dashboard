@@ -1,0 +1,73 @@
+@import "tailwindcss";
+
+:root {
+  --color-bg-base:          #ffffff;
+  --color-bg-surface:       #f7f7f7;
+  --color-bg-elevated:      #f0f0f0;
+  --color-text-base:        #2d2d2d;
+  --color-text-subdued:     #6b6b6b;
+  --color-text-muted:       #9e9e9e;
+  --color-accent-warm:      #f07c20;
+  --color-accent-warm-bg:   #fff3e8;
+  --color-accent-green:     #1db954;
+  --color-negative:         #e03d4a;
+  --color-warning:          #c47800;
+  --color-border:           #e0e0e0;
+  --color-border-muted:     #ececec;
+
+  --font-title:             'Helvetica Neue', Arial, sans-serif;
+  --font-body:              'Helvetica Neue', Arial, sans-serif;
+  --text-size-hero:         32px;
+  --text-size-section:      24px;
+  --text-size-heading:      18px;
+  --text-size-body:         16px;
+  --text-size-label:        14px;
+  --text-size-small:        12px;
+  --font-weight-bold:       700;
+  --font-weight-regular:    400;
+
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-6:  24px;
+  --space-8:  32px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  --radius-subtle:      4px;
+  --radius-card:        16px;
+  --radius-comfortable: 24px;
+  --radius-pill:        9999px;
+  --radius-circle:      50%;
+
+  --shadow-soft:   rgba(0,0,0,0.06) 0px 4px 16px;
+  --shadow-dialog: rgba(0,0,0,0.12) 0px 8px 32px;
+}
+
+@theme inline {
+  --color-background: var(--color-bg-base);
+  --color-foreground: var(--color-text-base);
+  --font-sans: var(--font-body);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+  font-family: var(--font-body);
+  color: var(--color-text-base);
+  background: var(--color-bg-base);
+}
+
+.step-enter {
+  opacity: 0;
+  transform: translateY(24px);
+}
+
+.step-visible {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 0.5s ease, transform 0.5s ease;
+}
