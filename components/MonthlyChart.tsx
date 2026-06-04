@@ -5,7 +5,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer,
 } from 'recharts';
-import { DAILY_DATA } from '@/lib/data';
+import type { TrendRow } from '@/lib/types';
 
 const LINES = [
   { key: '후라이드양념', label: '후라이드/양념치킨', color: '#f07c20' },
@@ -53,17 +53,19 @@ function ActiveDot(props: { cx?: number; cy?: number; stroke?: string }) {
   const { cx, cy, stroke } = props;
   if (cx == null || cy == null) return null;
   return (
-    <circle
-      cx={cx} cy={cy} r={5}
-      fill={stroke}
-      stroke="#fff"
-      strokeWidth={2}
+    <circle cx={cx} cy={cy} r={5} fill={stroke} stroke="#fff" strokeWidth={2}
       style={{ filter: `drop-shadow(0 0 6px ${stroke}88)` }}
     />
   );
 }
 
-export default function MonthlyChart({ visible }: { visible: boolean }) {
+export default function MonthlyChart({
+  visible,
+  rows,
+}: {
+  visible: boolean;
+  rows: TrendRow[];
+}) {
   const [hidden, setHidden] = useState<Set<string>>(new Set());
 
   function toggle(key: string) {
@@ -75,10 +77,9 @@ export default function MonthlyChart({ visible }: { visible: boolean }) {
     });
   }
 
-  // Show every 7th tick on x-axis (91 days → ~13 labels)
-  const ticks = DAILY_DATA
-    .filter((_, i) => i % 7 === 0)
-    .map(d => d.date);
+  // 13개 초과면 균등 간격 틱
+  const tickInterval = rows.length > 13 ? Math.ceil(rows.length / 13) : 1;
+  const ticks = rows.filter((_, i) => i % tickInterval === 0).map(r => r.label);
 
   return (
     <div style={{
@@ -88,31 +89,23 @@ export default function MonthlyChart({ visible }: { visible: boolean }) {
       width: '100%', height: '100%',
       display: 'flex', flexDirection: 'column',
     }}>
-      {/* 커스텀 범례 — 클릭으로 토글 */}
-      <div style={{
-        display: 'flex', gap: 12, flexWrap: 'wrap',
-        justifyContent: 'center',
-        paddingBottom: 8,
-      }}>
+      {/* 범례 — 클릭 토글 */}
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center', paddingBottom: 8 }}>
         {LINES.map(l => {
           const isHidden = hidden.has(l.key);
           return (
-            <button
-              key={l.key}
-              onClick={() => toggle(l.key)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 6,
-                padding: '4px 10px',
-                borderRadius: 9999,
-                border: `1.5px solid ${isHidden ? '#e5e7eb' : l.color}`,
-                background: isHidden ? '#f9fafb' : `${l.color}14`,
-                cursor: 'pointer',
-                fontSize: 12,
-                color: isHidden ? '#9e9e9e' : l.color,
-                fontWeight: isHidden ? 400 : 600,
-                transition: 'all 0.2s ease',
-              }}
-            >
+            <button key={l.key} onClick={() => toggle(l.key)} style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '4px 10px',
+              borderRadius: 9999,
+              border: `1.5px solid ${isHidden ? '#e5e7eb' : l.color}`,
+              background: isHidden ? '#f9fafb' : `${l.color}14`,
+              cursor: 'pointer',
+              fontSize: 12,
+              color: isHidden ? '#9e9e9e' : l.color,
+              fontWeight: isHidden ? 400 : 600,
+              transition: 'all 0.2s ease',
+            }}>
               <span style={{
                 width: 8, height: 8, borderRadius: '50%',
                 background: isHidden ? '#d1d5db' : l.color,
@@ -127,17 +120,10 @@ export default function MonthlyChart({ visible }: { visible: boolean }) {
 
       <div style={{ flex: 1, minHeight: 0 }}>
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart
-            data={DAILY_DATA}
-            margin={{ top: 8, right: 24, left: 0, bottom: 8 }}
-          >
-            <CartesianGrid
-              vertical={false}
-              strokeDasharray="4 4"
-              stroke="rgba(0,0,0,0.06)"
-            />
+          <LineChart data={rows} margin={{ top: 8, right: 24, left: 0, bottom: 8 }}>
+            <CartesianGrid vertical={false} strokeDasharray="4 4" stroke="rgba(0,0,0,0.06)" />
             <XAxis
-              dataKey="date"
+              dataKey="label"
               axisLine={false}
               tickLine={false}
               tick={{ fill: '#9e9e9e', fontSize: 11 }}
@@ -150,7 +136,6 @@ export default function MonthlyChart({ visible }: { visible: boolean }) {
               tickFormatter={v => `${v}만`}
             />
             <Tooltip content={<DarkTooltip />} />
-
             {LINES.map(l => (
               <Line
                 key={l.key}

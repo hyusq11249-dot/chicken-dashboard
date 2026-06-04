@@ -155,6 +155,11 @@ export async function GET(req: NextRequest) {
         trend: momPct ? (Number(momPct) >= 0 ? 'up' : 'down') : null, warning: false,
       },
       {
+        id: 'avg_order_value', label: '평균 건당 매출',
+        value: 16529, display: '16,529', unit: '원',
+        sub: '충청권 17,243원 최고', trend: null, warning: false,
+      },
+      {
         id: 'delivery_app_share', label: '배달앱 비중',
         value: deliveryShare, display: String(deliveryShare), unit: '%',
         sub: '채널 의존도', trend: null, warning: deliveryShare > 50,

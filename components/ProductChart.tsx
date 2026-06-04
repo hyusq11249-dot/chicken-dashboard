@@ -4,17 +4,13 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, Cell,
   ResponsiveContainer, LabelList,
 } from 'recharts';
-import { PRODUCT_DATA } from '@/lib/data';
+import type { ProductItem } from '@/lib/types';
 
-const MAX_VAL = PRODUCT_DATA[0].value;
-
-// 순위별 색상: 1위 오렌지, 2~5 인디고, 나머지 뮤트
 function barColor(i: number) {
   if (i === 0) return '#f07c20';
   if (i < 5)   return '#6366f1';
   return '#d1d5db';
 }
-
 function barGradId(i: number) {
   if (i === 0) return 'pg-org';
   if (i < 5)   return 'pg-ind';
@@ -23,7 +19,7 @@ function barGradId(i: number) {
 
 function DarkTooltip({ active, payload }: {
   active?: boolean;
-  payload?: { payload: { name: string; value: number } }[];
+  payload?: { payload: { name: string; value: number; display: string } }[];
 }) {
   if (!active || !payload?.length) return null;
   const d = payload[0].payload;
@@ -37,13 +33,27 @@ function DarkTooltip({ active, payload }: {
     }}>
       <p style={{ color: 'rgba(255,255,255,0.65)', fontSize: 12, marginBottom: 4 }}>{d.name}</p>
       <p style={{ color: '#f07c20', fontWeight: 700, fontSize: 16 }}>
-        {d.value.toLocaleString()}<span style={{ fontSize: 11, fontWeight: 400, marginLeft: 4 }}>만원</span>
+        {d.display}<span style={{ fontSize: 11, fontWeight: 400, marginLeft: 4 }}>원</span>
       </p>
     </div>
   );
 }
 
-export default function ProductChart({ visible }: { visible: boolean }) {
+export default function ProductChart({
+  visible,
+  products,
+}: {
+  visible: boolean;
+  products: ProductItem[];
+}) {
+  // 만원 단위로 변환
+  const data = products.map(p => ({
+    name:    p.name,
+    value:   Math.round(p.amount / 10000),
+    display: p.display,
+  }));
+  const maxVal = data[0]?.value ?? 1;
+
   return (
     <div style={{
       opacity: visible ? 1 : 0,
@@ -54,7 +64,7 @@ export default function ProductChart({ visible }: { visible: boolean }) {
       <ResponsiveContainer width="100%" height="100%">
         <BarChart
           layout="vertical"
-          data={PRODUCT_DATA}
+          data={data}
           margin={{ top: 4, right: 80, left: 4, bottom: 4 }}
           barCategoryGap="22%"
         >
@@ -73,11 +83,7 @@ export default function ProductChart({ visible }: { visible: boolean }) {
             </linearGradient>
           </defs>
 
-          <XAxis
-            type="number"
-            hide
-            domain={[0, MAX_VAL * 1.15]}
-          />
+          <XAxis type="number" hide domain={[0, maxVal * 1.15]} />
           <YAxis
             type="category"
             dataKey="name"
@@ -87,36 +93,24 @@ export default function ProductChart({ visible }: { visible: boolean }) {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             tick={({ x, y, payload, index }: any) => (
               <text x={x} y={y} textAnchor="end" dominantBaseline="middle">
-                {/* 순위 번호 */}
-                <tspan
-                  fontSize={11}
-                  fontWeight={700}
-                  fill={barColor(index)}
-                >
+                <tspan fontSize={11} fontWeight={700} fill={barColor(index)}>
                   {String(index + 1).padStart(2, '0')}
                 </tspan>
-                {/* 제품명 */}
-                <tspan
-                  dx={6}
-                  fontSize={12}
-                  fill="#6b6b6b"
-                >
-                  {payload.value}
-                </tspan>
+                <tspan dx={6} fontSize={12} fill="#6b6b6b">{payload.value}</tspan>
               </text>
             )}
           />
           <Tooltip content={<DarkTooltip />} cursor={false} />
 
           <Bar dataKey="value" radius={[0, 6, 6, 0]}>
-            {PRODUCT_DATA.map((_, i) => (
+            {data.map((_, i) => (
               <Cell key={i} fill={`url(#${barGradId(i)})`} />
             ))}
             <LabelList
-              dataKey="value"
+              dataKey="display"
               position="right"
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              formatter={(v: any) => `${Number(v).toLocaleString()}만`}
+              formatter={(v: any) => `${v}`}
               style={{ fill: '#9e9e9e', fontSize: 12 }}
             />
           </Bar>
