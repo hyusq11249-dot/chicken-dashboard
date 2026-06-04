@@ -19,12 +19,15 @@ const PERIOD_LABELS: Record<Period, string> = {
   weekly:    '주간',
   monthly:   '월간',
   quarterly: '분기',
+  custom:    '직접입력',
 };
 
 export default function Dashboard() {
   const [globalStep,    setGlobalStep]    = useState(0);
   const [highWaterMark, setHighWaterMark] = useState(0);
   const [period,        setPeriod]        = useState<Period>('monthly');
+  const [customStart,   setCustomStart]   = useState('2025-09-01');
+  const [customEnd,     setCustomEnd]     = useState('2025-11-30');
   const [apiData,       setApiData]       = useState<DashboardData | null>(null);
   const [isLoading,     setIsLoading]     = useState(true);
   const [isError,       setIsError]       = useState(false);
@@ -35,9 +38,13 @@ export default function Dashboard() {
 
   // API fetch
   useEffect(() => {
+    if (period === 'custom' && (!customStart || !customEnd)) return;
     setIsLoading(true);
     setIsError(false);
-    fetch(`/api/dashboard?period=${period}`)
+    const url = period === 'custom'
+      ? `/api/dashboard?period=custom&start=${customStart}&end=${customEnd}`
+      : `/api/dashboard?period=${period}`;
+    fetch(url)
       .then(r => {
         if (!r.ok) throw new Error('fetch failed');
         return r.json() as Promise<DashboardData>;
@@ -50,7 +57,7 @@ export default function Dashboard() {
         setIsError(true);
         setIsLoading(false);
       });
-  }, [period]);
+  }, [period, customStart, customEnd]);
 
   // 섹션 스크롤
   useEffect(() => {
@@ -197,6 +204,41 @@ export default function Dashboard() {
               </button>
             ))}
           </div>
+
+          {/* 날짜 직접 입력 */}
+          {period === 'custom' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 4 }}>
+              <input
+                type="date"
+                value={customStart}
+                min="2023-01-01"
+                max={customEnd}
+                onChange={e => setCustomStart(e.target.value)}
+                style={{
+                  fontSize: 11, padding: '3px 8px',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: 6, color: 'var(--color-text-base)',
+                  background: '#fff', cursor: 'pointer',
+                  outline: 'none',
+                }}
+              />
+              <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>~</span>
+              <input
+                type="date"
+                value={customEnd}
+                min={customStart}
+                max="2025-11-30"
+                onChange={e => setCustomEnd(e.target.value)}
+                style={{
+                  fontSize: 11, padding: '3px 8px',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: 6, color: 'var(--color-text-base)',
+                  background: '#fff', cursor: 'pointer',
+                  outline: 'none',
+                }}
+              />
+            </div>
+          )}
         </div>
 
         {/* 우: 섹션 탭 */}

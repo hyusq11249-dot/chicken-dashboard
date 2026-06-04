@@ -1,25 +1,47 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabase } from '@/lib/supabase';
 
-type Period = 'weekly' | 'monthly' | 'quarterly';
+type Period = 'weekly' | 'monthly' | 'quarterly' | 'custom';
+type GroupBy = 'daily' | 'weekly' | 'monthly' | 'quarterly';
 
 // ── 날짜 범위 계산 ─────────────────────────────────────────────
-function dateRange(period: Period): { start: string; end: string } {
-  const end = new Date();
+function resolveDateRange(
+  period: Period,
+  customStart?: string,
+  customEnd?: string,
+): { start: string; end: string } {
+  if (period === 'custom' && customStart && customEnd) {
+    return { start: customStart, end: customEnd };
+  }
+  const end   = new Date();
   const start = new Date();
-  if (period === 'weekly')      start.setDate(end.getDate() - 7 * 13);   // ~13주
-  else if (period === 'monthly') start.setMonth(end.getMonth() - 2);      // 3개월
-  else                           start.setMonth(end.getMonth() - 8);      // ~3분기
+  if      (period === 'weekly')    start.setDate(end.getDate() - 7 * 13);
+  else if (period === 'monthly')   start.setMonth(end.getMonth() - 2);
+  else                             start.setMonth(end.getMonth() - 8);
   return {
     start: start.toISOString().slice(0, 10),
     end:   end.toISOString().slice(0, 10),
   };
 }
 
+// 범위 길이에 따라 집계 단위 자동 결정
+function resolveGroupBy(period: Period, start: string, end: string): GroupBy {
+  if (period !== 'custom') {
+    if (period === 'weekly')    return 'weekly';
+    if (period === 'monthly')   return 'monthly';
+    if (period === 'quarterly') return 'quarterly';
+  }
+  const days = (new Date(end).getTime() - new Date(start).getTime()) / 86400000;
+  if (days <= 14)  return 'daily';
+  if (days <= 90)  return 'weekly';
+  if (days <= 365) return 'monthly';
+  return 'quarterly';
+}
+
 // ── 트렌드 rows 집계 ──────────────────────────────────────────
 function groupTrend(
   rows: { sale_date: string; category: string; amount_krw: number }[],
-  period: Period,
+  groupBy: GroupBy,
 ) {
   const map = new Map<string, { dateStart: string; dateEnd: string; [k: string]: unknown }>();
 
@@ -27,17 +49,19 @@ function groupTrend(
     const d = new Date(row.sale_date);
     let label: string;
 
-    if (period === 'quarterly') {
+    if (groupBy === 'quarterly') {
       const q = Math.floor(d.getMonth() / 3) + 1;
       label = `Q${q} ${d.getFullYear()}`;
-    } else if (period === 'monthly') {
+    } else if (groupBy === 'monthly') {
       label = `${d.getMonth() + 1}월`;
-    } else {
-      // weekly: 월요일 기준
+    } else if (groupBy === 'weekly') {
       const day = d.getDay();
       const mon = new Date(d);
       mon.setDate(d.getDate() - ((day + 6) % 7));
       label = `${String(mon.getMonth() + 1).padStart(2, '0')}/${String(mon.getDate()).padStart(2, '0')}`;
+    } else {
+      // daily
+      label = `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`;
     }
 
     if (!map.has(label)) {
@@ -50,7 +74,7 @@ function groupTrend(
     }
     const entry = map.get(label)!;
     entry.dateEnd = row.sale_date;
-    (entry[row.category] as number) += Math.round(row.amount_krw / 10000); // 만원
+    (entry[row.category] as number) += Math.round(row.amount_krw / 10000);
   }
 
   return Array.from(map.values());
@@ -63,10 +87,18 @@ function fmtKrw(won: number): string {
   return `${man.toLocaleString()}만`;
 }
 
-// ── GET /api/dashboard?period=weekly|monthly|quarterly ────────
+// ── GET /api/dashboard ────────────────────────────────────────
+// params: period=weekly|monthly|quarterly|custom
+//         start=YYYY-MM-DD  (period=custom일 때 필수)
+//         end=YYYY-MM-DD    (period=custom일 때 필수)
 export async function GET(req: NextRequest) {
-  const period = (req.nextUrl.searchParams.get('period') ?? 'monthly') as Period;
-  const { start, end } = dateRange(period);
+  const params       = req.nextUrl.searchParams;
+  const period       = (params.get('period') ?? 'monthly') as Period;
+  const customStart  = params.get('start') ?? undefined;
+  const customEnd    = params.get('end')   ?? undefined;
+
+  const { start, end } = resolveDateRange(period, customStart, customEnd);
+  const groupBy        = resolveGroupBy(period, start, end);
 
   const supabase = getSupabase();
 
@@ -97,35 +129,29 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'DB query failed' }, { status: 500 });
   }
 
-  // ── KPI 계산 ──────────────────────────────────────────────
-  const dailyRows = dailyRes.data ?? [];
-  const totalWon  = dailyRows.reduce((s, r) => s + r.amount_krw, 0);
+  const dailyRows  = dailyRes.data  ?? [];
+  const totalWon   = dailyRows.reduce((s, r) => s + r.amount_krw, 0);
 
-  // 이전 기간 총매출 (전월 비교용)
-  const monthRows = dailyRows.filter(r => {
-    const m = new Date(r.sale_date).getMonth();
-    return m === new Date(end).getMonth();
-  });
-  const prevRows = dailyRows.filter(r => {
-    const m = new Date(r.sale_date).getMonth();
-    return m === new Date(end).getMonth() - 1;
-  });
-  const thisMonthWon = monthRows.reduce((s, r) => s + r.amount_krw, 0);
-  const prevMonthWon = prevRows.reduce((s, r) => s + r.amount_krw, 0);
+  const endMonth   = new Date(end).getMonth();
+  const thisMonthWon = dailyRows
+    .filter(r => new Date(r.sale_date).getMonth() === endMonth)
+    .reduce((s, r) => s + r.amount_krw, 0);
+  const prevMonthWon = dailyRows
+    .filter(r => new Date(r.sale_date).getMonth() === endMonth - 1)
+    .reduce((s, r) => s + r.amount_krw, 0);
   const momPct = prevMonthWon > 0
     ? ((thisMonthWon - prevMonthWon) / prevMonthWon * 100).toFixed(1)
     : null;
 
-  // 채널 합계
-  const channelRows = channelRes.data ?? [];
   const channelMap = new Map<string, number>();
-  for (const r of channelRows) channelMap.set(r.channel, (channelMap.get(r.channel) ?? 0) + r.amount_krw);
-  const channelTotal = Array.from(channelMap.values()).reduce((s, v) => s + v, 0);
-  const deliveryShare = channelTotal > 0
+  for (const r of channelRes.data ?? []) {
+    channelMap.set(r.channel, (channelMap.get(r.channel) ?? 0) + r.amount_krw);
+  }
+  const channelTotal   = Array.from(channelMap.values()).reduce((s, v) => s + v, 0);
+  const deliveryShare  = channelTotal > 0
     ? Math.round((channelMap.get('배달앱') ?? 0) / channelTotal * 1000) / 10
     : 0;
 
-  // 제품 합계
   const productMap = new Map<string, number>();
   for (const r of productRes.data ?? []) {
     productMap.set(r.product_name, (productMap.get(r.product_name) ?? 0) + r.amount_krw);
@@ -134,19 +160,13 @@ export async function GET(req: NextRequest) {
     .sort((a, b) => b[1] - a[1])
     .slice(0, 10);
 
-  // ── 응답 조합 ─────────────────────────────────────────────
   return NextResponse.json({
-    meta: {
-      period,
-      rangeStart:   start,
-      rangeEnd:     end,
-      generatedAt:  new Date().toISOString(),
-    },
+    meta: { period, groupBy, rangeStart: start, rangeEnd: end, generatedAt: new Date().toISOString() },
     kpis: [
       {
         id: 'total_revenue', label: '기간 총매출',
         value: totalWon, display: fmtKrw(totalWon), unit: '원',
-        sub: `${start.slice(0,7)} ~ ${end.slice(0,7)}`, trend: null, warning: false,
+        sub: `${start.slice(0, 7)} ~ ${end.slice(0, 7)}`, trend: null, warning: false,
       },
       {
         id: 'latest_month_revenue', label: `${new Date(end).getMonth() + 1}월 매출`,
@@ -166,7 +186,7 @@ export async function GET(req: NextRequest) {
       },
     ],
     trend: {
-      rows: groupTrend(dailyRows, period),
+      rows: groupTrend(dailyRows, groupBy),
       categories: ['후라이드양념', '순살치킨', '사이드메뉴', '음료기타'],
     },
     channels: Array.from(channelMap.entries()).map(([name, amount]) => ({
@@ -178,14 +198,11 @@ export async function GET(req: NextRequest) {
              : name === '자사앱' ? '전환 기회' : null,
     })).sort((a, b) => b.share - a.share),
     products: sortedProducts.map(([name, amount], i) => ({
-      rank:    i + 1,
-      name,
-      amount,
-      display: fmtKrw(amount),
+      rank: i + 1, name, amount, display: fmtKrw(amount),
     })),
     insights: {
-      kpi:     `${period === 'monthly' ? '3개월' : period === 'weekly' ? '13주' : '분기'} 총 ${fmtKrw(totalWon)}원. 배달앱 비중 ${deliveryShare}% — 채널 다변화 필요.`,
-      trend:   '후라이드계 매출 견인 지속. 순살치킨 추세 점검 필요.',
+      kpi:     `${start.slice(0, 7)} ~ ${end.slice(0, 7)} 총 ${fmtKrw(totalWon)}원. 배달앱 비중 ${deliveryShare}% — 채널 다변화 필요.`,
+      trend:   `${groupBy === 'daily' ? '일별' : groupBy === 'weekly' ? '주별' : groupBy === 'monthly' ? '월별' : '분기별'} 추이. 후라이드계 매출 견인 지속.`,
       channel: `배달앱 ${deliveryShare}% 집중 → 플랫폼 수수료 리스크. 자사앱 전환 권장.`,
       product: '크리스피치킨 단품 1위. 사이드+음료 세트화로 객단가 상승 가능.',
     },

@@ -1,4 +1,4 @@
-export type Period = 'weekly' | 'monthly' | 'quarterly';
+export type Period = 'weekly' | 'monthly' | 'quarterly' | 'custom';
 
 export interface KpiItem {
   id: string;
