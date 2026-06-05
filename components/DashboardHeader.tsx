@@ -68,6 +68,13 @@ export default function DashboardHeader({
             borderRadius: 'var(--radius-pill)', transition: 'all 0.2s',
           }}>{i + 1}. {title}</button>
         ))}
+        <a href={process.env.NEXT_PUBLIC_VOC_URL ?? 'https://ai-assistant-nu-seven.vercel.app'} target="_blank" rel="noopener noreferrer" style={{
+          marginLeft: 8, fontSize: 11, fontWeight: 600,
+          color: '#6366f1', background: '#eef2ff',
+          border: 'none', cursor: 'pointer', padding: '4px 12px',
+          borderRadius: 9999, textDecoration: 'none',
+          display: 'flex', alignItems: 'center', gap: 4,
+        }}>🧠 VOC Assistant</a>
       </div>
     </header>
   );
