@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { STEP_MAP } from '@/lib/mockData';
 import { fetchDashboard } from '@/lib/data-source';
+import { getSupabase } from '@/lib/supabase';
 import type { DashboardData, Period } from '@/lib/types';
 
 const TOTAL_STEPS = STEP_MAP.length;
@@ -36,6 +37,25 @@ export function useDashboard() {
     if (!el) return;
     el.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, [currentSection]);
+
+  // 로딩 화면 없이 백그라운드 갱신 — Realtime 이벤트용
+  const silentRefresh = useCallback(() => {
+    if (period === 'custom' && (!customStart || !customEnd)) return;
+    fetchDashboard(period, customStart, customEnd)
+      .then(data => setApiData(data))
+      .catch(() => {});
+  }, [period, customStart, customEnd]);
+
+  useEffect(() => {
+    const supabase = getSupabase();
+    const channel = supabase
+      .channel('dashboard-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'daily_sales' },   silentRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'channel_sales' }, silentRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'product_sales' }, silentRefresh)
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [silentRefresh]);
 
   const changePeriod = useCallback((p: Period) => {
     setPeriod(p);
