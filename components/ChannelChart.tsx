@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type ComponentProps } from 'react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Sector } from 'recharts';
 import type { ChannelItem } from '@/lib/types';
 import { DarkTooltipShell } from '@/components/DarkTooltip';
@@ -81,7 +81,7 @@ export default function ChannelChart({
             paddingAngle={3}
             onMouseEnter={(_: unknown, idx: number) => setActiveIdx(idx)}
             onMouseLeave={() => setActiveIdx(0)}
-            {...({ activeIndex: activeIdx, activeShape: ActiveShape } as any)}
+            {...({ activeIndex: activeIdx, activeShape: ActiveShape } as unknown as ComponentProps<typeof Pie>)}
           >
             {channels.map((_, i) => (
               <Cell key={i} fill={`url(#rg-${i})`} stroke="none" />

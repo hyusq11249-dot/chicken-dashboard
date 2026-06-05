@@ -85,8 +85,7 @@ export default function ProductChart({
             width={104}
             axisLine={false}
             tickLine={false}
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            tick={({ x, y, payload, index }: any) => (
+            tick={({ x, y, payload, index }: { x: number | string; y: number | string; payload: { value: string | number }; index: number }) => (
               <text x={x} y={y} textAnchor="end" dominantBaseline="middle">
                 <tspan fontSize={11} fontWeight={700} fill={barColor(index)}>
                   {String(index + 1).padStart(2, '0')}
@@ -104,8 +103,7 @@ export default function ProductChart({
             <LabelList
               dataKey="display"
               position="right"
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              formatter={(v: any) => `${v}`}
+              formatter={(v: unknown) => String(v)}
               style={{ fill: '#9e9e9e', fontSize: 12 }}
             />
           </Bar>

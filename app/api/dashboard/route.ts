@@ -1,23 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabase } from '@/lib/supabase';
-
-type Period = 'weekly' | 'monthly' | 'quarterly' | 'custom';
+import { fmtKrw } from '@/lib/formatters';
+import type { Period } from '@/lib/types';
 type GroupBy = 'daily' | 'weekly' | 'monthly' | 'quarterly';
 
 // ── 날짜 범위 계산 ─────────────────────────────────────────────
+// anchor: DB 최신 날짜 기준 (new Date()가 데이터보다 미래일 때 대응)
 function resolveDateRange(
   period: Period,
+  anchor: Date,
   customStart?: string,
   customEnd?: string,
 ): { start: string; end: string } {
   if (period === 'custom' && customStart && customEnd) {
     return { start: customStart, end: customEnd };
   }
-  const end   = new Date();
-  const start = new Date();
-  if      (period === 'weekly')    start.setDate(end.getDate() - 7 * 13);
-  else if (period === 'monthly')   start.setMonth(end.getMonth() - 2);
-  else                             start.setMonth(end.getMonth() - 8);
+  const end   = new Date(anchor);
+  const start = new Date(anchor);
+  if (period === 'weekly') {
+    start.setDate(end.getDate() - 7 * 13);           // 13주
+  } else {
+    start.setDate(1);                                 // 말일 오버플로우 방지 후 월 조정
+    if (period === 'monthly')   start.setMonth(end.getMonth() - 2);   // 3개월
+    else                        start.setMonth(end.getMonth() - 11);  // 4분기 = 12개월
+  }
   return {
     start: start.toISOString().slice(0, 10),
     end:   end.toISOString().slice(0, 10),
@@ -45,6 +51,10 @@ function groupTrend(
 ) {
   const map = new Map<string, { dateStart: string; dateEnd: string; [k: string]: unknown }>();
 
+  // 연도가 복수인 경우 monthly 레이블에 연도 표기
+  const years = new Set(rows.map(r => new Date(r.sale_date).getFullYear()));
+  const multiYear = years.size > 1;
+
   for (const row of rows) {
     const d = new Date(row.sale_date);
     let label: string;
@@ -53,7 +63,9 @@ function groupTrend(
       const q = Math.floor(d.getMonth() / 3) + 1;
       label = `Q${q} ${d.getFullYear()}`;
     } else if (groupBy === 'monthly') {
-      label = `${d.getMonth() + 1}월`;
+      label = multiYear
+        ? `${d.getMonth() + 1}월 '${String(d.getFullYear()).slice(2)}`
+        : `${d.getMonth() + 1}월`;
     } else if (groupBy === 'weekly') {
       const day = d.getDay();
       const mon = new Date(d);
@@ -80,13 +92,6 @@ function groupTrend(
   return Array.from(map.values());
 }
 
-// ── 포맷 헬퍼 ─────────────────────────────────────────────────
-function fmtKrw(won: number): string {
-  const man = Math.round(won / 10000);
-  if (man >= 10000) return `${Math.round(man / 1000) / 10}억 ${man % 10000 > 0 ? (man % 10000).toLocaleString() + '만' : ''}`.trim();
-  return `${man.toLocaleString()}만`;
-}
-
 // ── GET /api/dashboard ────────────────────────────────────────
 // params: period=weekly|monthly|quarterly|custom
 //         start=YYYY-MM-DD  (period=custom일 때 필수)
@@ -97,10 +102,19 @@ export async function GET(req: NextRequest) {
   const customStart  = params.get('start') ?? undefined;
   const customEnd    = params.get('end')   ?? undefined;
 
-  const { start, end } = resolveDateRange(period, customStart, customEnd);
-  const groupBy        = resolveGroupBy(period, start, end);
-
   const supabase = getSupabase();
+
+  // DB 최신 날짜를 기준점으로 — 시드 데이터가 과거에 끝나도 올바른 범위 계산
+  const { data: anchorRow } = await supabase
+    .from('daily_sales')
+    .select('sale_date')
+    .order('sale_date', { ascending: false })
+    .limit(1)
+    .single();
+  const anchor = anchorRow ? new Date(anchorRow.sale_date) : new Date();
+
+  const { start, end } = resolveDateRange(period, anchor, customStart, customEnd);
+  const groupBy        = resolveGroupBy(period, start, end);
 
   const [dailyRes, channelRes, productRes] = await Promise.all([
     supabase
